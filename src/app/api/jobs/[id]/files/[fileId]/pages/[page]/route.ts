@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
 
   const requested = Number(new URL(request.url).searchParams.get('w') ?? 240);
   try {
-    const jpg = await pageThumb(file.storedPath, jobThumbsDir(id), file.id, page, thumbWidth(requested));
+    const jpg = await pageThumb(file.storedPath, jobThumbsDir(id), file.id, page, thumbWidth(requested), file.rotations?.[page] ?? 0);
     return new Response(new Uint8Array(jpg), {
       headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400, immutable' },
     });

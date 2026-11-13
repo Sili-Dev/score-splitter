@@ -2,11 +2,11 @@ import { createWriteStream } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PDFDocument } from 'pdf-lib';
+import { degrees, PDFDocument } from 'pdf-lib';
 import yauzl from 'yauzl';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ExportSourceError, exportProblems, planExport, safeName, writeExportZip } from '@/lib/export';
-import { extractPages } from '@/lib/pdf/split';
+import { copyPagesFrom, extractPages, loadForSplitting } from '@/lib/pdf/split';
 import type { FileClass, Job, Part, SourceFile } from '@/lib/types';
 import { makeScanPdf } from './helpers/makeScan';
 
@@ -260,7 +260,29 @@ describe('writeExportZip', () => {
     expect(doc.getPageCount()).toBe(3);
   });
 
+  it('turns copied pages by the given rotations, adding to any they had', async () => {
+    const source = await loadForSplitting(fivePages);
+    source.getPage(2).setRotation(degrees(90));
+    const doc = await PDFDocument.load(await copyPagesFrom(source, [1, 2, 3], [0, 270, 270, 0, 90]));
+    expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual([270, 0, 0]);
+  });
+
   it('rejects a page that does not exist', async () => {
     await expect(extractPages(fivePages, [7])).rejects.toThrow();
+  });
+});
+
+describe('planExport with turned pages', () => {
+  it('hands the rotations to each part of the file', () => {
+    const rotations = [180, 180, 0, 0, 0] as const;
+    const j = job([file('combined', [part('A', [0, 1]), part('B', [2, 3, 4])], { rotations: [...rotations] })]);
+    expect(planExport(j).map((e) => [e.pages, e.rotations])).toEqual([
+      [[0, 1], rotations],
+      [[2, 3, 4], rotations],
+    ]);
+  });
+  it('splits rather than copies a whole file that has pages to turn', () => {
+    const j = job([file('single', [part('A', [0])], { rotations: [90] })]);
+    expect(planExport(j).map((e) => e.pages)).toEqual([[0]]);
   });
 });

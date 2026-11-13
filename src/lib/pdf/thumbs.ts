@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { nanoid } from 'nanoid';
+import type { Rotation } from '@/lib/types';
 import { openPdf, type OpenPdf } from './render';
 
 /** How long an opened PDF is kept after its last thumbnail, so a screenful of pages opens the file once. */
@@ -47,8 +48,9 @@ export async function pageThumb(
   cacheKey: string,
   page: number,
   width: number,
+  rotation: Rotation = 0,
 ): Promise<Buffer> {
-  const cached = join(cacheDir, `${cacheKey}-${page}-${width}.jpg`);
+  const cached = join(cacheDir, `${cacheKey}-${page}-${width}${rotation ? `-r${rotation}` : ''}.jpg`);
   try {
     return await readFile(cached);
   } catch {
@@ -63,7 +65,7 @@ export async function pageThumb(
   }
   clearTimeout(entry.timer);
   const current = entry;
-  const render = current.queue.catch(() => undefined).then(async () => (await current.pdf).renderThumb(page, width));
+  const render = current.queue.catch(() => undefined).then(async () => (await current.pdf).renderThumb(page, width, rotation));
   current.queue = render;
   try {
     const jpg = await render;

@@ -137,6 +137,8 @@ async function processFile(jobId: string, file: SourceFile, deps: ProcessDeps): 
     cls = 'combined';
   }
   let parts: Part[] = [];
+  // Kept from an earlier reading unless this one reads the pages again.
+  let rotations: SourceFile['rotations'] | 'keep' = 'keep';
   if (cls === 'single') {
     const name = partNameFromFileName(file.originalName) ?? partNameFromText(firstPageText) ?? 'Unbekannt 1';
     parts = wholeFile(name, pageCount);
@@ -155,12 +157,17 @@ async function processFile(jobId: string, file: SourceFile, deps: ProcessDeps): 
       getConfig().ocrConcurrency,
     );
     parts = groupPages(detections);
+    const turns = detections.map((d) => d.rotation ?? 0);
+    rotations = turns.some(Boolean) ? turns : undefined;
   }
 
   await updateJob(jobId, (job) =>
     patchFile(job, file.id, (f) => {
       const { progress: _progress, error: _error, ...rest } = f;
-      return { ...rest, class: cls, pageCount, parts, status: 'done' };
+      const done: SourceFile = { ...rest, class: cls, pageCount, parts, status: 'done' };
+      if (rotations === 'keep') return done;
+      const { rotations: _old, ...fresh } = done;
+      return rotations ? { ...fresh, rotations } : fresh;
     }),
   );
 }

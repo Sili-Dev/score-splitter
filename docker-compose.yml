@@ -1,8 +1,7 @@
 # Score Splitter: paste this into Arcane (or run `docker compose up -d`).
-# Replace OWNER with the GitHub account that publishes the image.
 services:
   score-splitter:
-    image: ghcr.io/OWNER/score-splitter:latest
+    image: ghcr.io/sili-dev/score-splitter:latest
     container_name: score-splitter
     restart: unless-stopped
     ports:

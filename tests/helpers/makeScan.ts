@@ -1,7 +1,13 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { PDFDocument } from 'pdf-lib';
 
-export type ScanPage = { left?: string; centre?: string[]; right?: string };
+export type ScanPage = {
+  left?: string;
+  centre?: string[];
+  right?: string;
+  /** The sheet was scanned turned this many degrees clockwise, with no /Rotate to undo it. */
+  turned?: 90 | 180 | 270;
+};
 
 const W = 1240;
 const H = 1754;
@@ -49,9 +55,18 @@ export async function makeScanPdf(pages: ScanPage[]): Promise<Uint8Array> {
       }
     }
 
-    const jpg = await pdf.embedJpg(canvas.toBuffer('image/jpeg', 85));
-    const page = pdf.addPage([595, 842]);
-    page.drawImage(jpg, { x: 0, y: 0, width: 595, height: 842 });
+    const turned = spec.turned ?? 0;
+    const quarter = turned === 90 || turned === 270;
+    const scan = createCanvas(quarter ? H : W, quarter ? W : H);
+    const sctx = scan.getContext('2d');
+    sctx.translate(scan.width / 2, scan.height / 2);
+    sctx.rotate((turned * Math.PI) / 180);
+    sctx.drawImage(canvas, -W / 2, -H / 2);
+
+    const jpg = await pdf.embedJpg(scan.toBuffer('image/jpeg', 85));
+    const [w, h] = quarter ? [842, 595] : [595, 842];
+    const page = pdf.addPage([w, h]);
+    page.drawImage(jpg, { x: 0, y: 0, width: w, height: h });
   }
   return pdf.save();
 }

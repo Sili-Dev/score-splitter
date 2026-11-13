@@ -56,7 +56,7 @@ export async function prepareExport(job: Job): Promise<(out: NodeJS.WritableStre
         archive.file(entry.srcPath, { name: entry.zipPath });
       } else {
         const source = sources.get(entry.srcPath) as PDFDocument;
-        archive.append(Buffer.from(await copyPagesFrom(source, entry.pages)), { name: entry.zipPath });
+        archive.append(Buffer.from(await copyPagesFrom(source, entry.pages, entry.rotations)), { name: entry.zipPath });
       }
     }
     await archive.finalize();

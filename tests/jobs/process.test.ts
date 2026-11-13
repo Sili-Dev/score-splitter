@@ -105,6 +105,7 @@ it('processes a zip into a ready job', async () => {
     ['Timpani', [3]],
   ]);
   expect(combined.progress).toBeUndefined();
+  expect(combined.rotations).toBeUndefined();
   expect(combined.storedPath.startsWith(jobFilesDir(job.id))).toBe(true);
 }, 60_000);
 
@@ -291,4 +292,17 @@ it('still reads a digital PDF that names one part throughout as that single part
   const file = byName((await readJob(job.id)) as Job, 'scan0002.pdf');
   expect(file).toMatchObject({ class: 'single', pageCount: 2 });
   expect(file.parts.map((p) => p.name)).toEqual(['Solo Cornet']);
+}, 60_000);
+
+it('keeps the rotation of every page of a combined file when one is turned', async () => {
+  const zip = await writeZip('turned.zip', [{ name: 'T/T - Einzelstimmen.pdf', data: scan4 }]);
+  const job = await createJob('upload');
+  await ingestZip(job.id, zip, 'T.zip');
+  const rotations = [0, 180, 180, 0] as const;
+  await processJob(job.id, {
+    async detectFile() {
+      return ['Solo Cornet', 'Timpani', null, 'Tuba'].map((name, i) => ({ ...D(name), rotation: rotations[i] }));
+    },
+  });
+  expect(byName((await readJob(job.id)) as Job, 'T - Einzelstimmen.pdf').rotations).toEqual(rotations);
 }, 60_000);

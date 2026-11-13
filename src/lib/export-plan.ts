@@ -1,9 +1,10 @@
 // The pure half of export: what goes into the zip and what stands in the way.
 // Kept free of Node-only imports so the review screen can run it in the browser.
 import { isUnknownName } from '@/lib/detect/group';
-import type { Job, Part, SourceFile } from '@/lib/types';
+import type { Job, Part, Rotation, SourceFile } from '@/lib/types';
 
-export type ExportEntry = { zipPath: string; srcPath: string; pages: number[] | 'all' };
+/** `rotations`, indexed by source page, turns pages upright as they are copied. */
+export type ExportEntry = { zipPath: string; srcPath: string; pages: number[] | 'all'; rotations?: Rotation[] };
 export type ExportProblems = { blocking: string[]; warnings: string[] };
 
 const SCORE_NAME = 'Partitur';
@@ -35,7 +36,8 @@ function keptPages(file: SourceFile, part: Part): number[] {
 }
 
 function allPages(file: SourceFile): number[] | 'all' {
-  if (file.discarded.length === 0) return 'all';
+  // Only a file that needs no page dropped and no page turned is copied as it is.
+  if (file.discarded.length === 0 && !file.rotations) return 'all';
   return Array.from({ length: file.pageCount }, (_, i) => i).filter((p) => !file.discarded.includes(p));
 }
 
@@ -49,18 +51,24 @@ export function planExport(job: Job): ExportEntry[] {
     const title = safeName(piece.name);
     const folder = `${root}/${folderName(title)}`;
     const fileName = uniquer();
-    const add = (label: string, srcPath: string, pages: number[] | 'all') => {
+    const add = (label: string, file: SourceFile, pages: number[] | 'all') => {
       if (pages !== 'all' && pages.length === 0) return;
-      entries.push({ zipPath: `${folder}/${title} - ${fileName(safeName(label))}.pdf`, srcPath, pages });
+      const entry: ExportEntry = {
+        zipPath: `${folder}/${title} - ${fileName(safeName(label))}.pdf`,
+        srcPath: file.storedPath,
+        pages,
+      };
+      if (file.rotations) entry.rotations = file.rotations;
+      entries.push(entry);
     };
 
     const ready = piece.files.filter((f) => f.status === 'done');
-    for (const file of ready.filter((f) => f.class === 'score')) add(SCORE_NAME, file.storedPath, allPages(file));
+    for (const file of ready.filter((f) => f.class === 'score')) add(SCORE_NAME, file, allPages(file));
     for (const file of ready.filter((f) => f.class !== 'score')) {
       if (file.class === 'single') {
-        add(file.parts[0]?.name ?? 'Unbekannt 1', file.storedPath, allPages(file));
+        add(file.parts[0]?.name ?? 'Unbekannt 1', file, allPages(file));
       } else {
-        for (const part of file.parts) add(part.name, file.storedPath, keptPages(file, part));
+        for (const part of file.parts) add(part.name, file, keptPages(file, part));
       }
     }
   }

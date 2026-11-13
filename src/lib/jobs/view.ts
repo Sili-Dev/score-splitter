@@ -1,5 +1,5 @@
 import { getConfig } from '@/lib/config';
-import { exportProblems, type ExportProblems } from '@/lib/export';
+import { exportProblems, type ExportProblems } from '@/lib/export-plan';
 import type { Job, Piece, SourceFile } from '@/lib/types';
 
 /** A file as the browser sees it: everything but its location on the server. */

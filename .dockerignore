@@ -1,0 +1,15 @@
+.git
+.github
+.next
+.idea
+.superpowers
+node_modules
+data
+samples
+tessdata
+test-results
+playwright-report
+docs
+e2e
+tests
+*.md

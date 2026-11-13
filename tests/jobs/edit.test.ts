@@ -58,6 +58,14 @@ describe('split', () => {
     expect(partsOf(out)[2].id).not.toBe('b');
   });
 
+  it('gives the new part the same id every time, so browser and server agree on it', () => {
+    const op = { op: 'split', fileId: 'f', partId: 'b', atPage: 2 } as const;
+    const once = partsOf(applyEdit(base(), op));
+    const again = partsOf(applyEdit(base(), op));
+    expect(once[2].id).toBe(again[2].id);
+    expect(new Set(once.map((p) => p.id)).size).toBe(4);
+  });
+
   it('numbers a second unknown part', () => {
     let job = applyEdit(base(), { op: 'split', fileId: 'f', partId: 'b', atPage: 2 });
     job = applyEdit(job, { op: 'split', fileId: 'f', partId: partsOf(job)[2].id, atPage: 3 });

@@ -36,6 +36,8 @@ export function useJob(id: string): UseJob {
   }, [id]);
 
   useEffect(() => {
+    // Fetch on arrival; the state changes it makes all happen after the response.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

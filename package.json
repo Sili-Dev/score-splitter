@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "probe": "tsx scripts/probe.ts",
-    "postinstall": "node scripts/fetch-tessdata.mjs"
+    "postinstall": "node scripts/fetch-tessdata.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

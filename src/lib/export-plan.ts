@@ -11,7 +11,6 @@ const SCORE_NAME = 'Partitur';
 /** Makes a string safe as a file or folder name on Windows, macOS, Linux and cloud drives. */
 export function safeName(s: string): string {
   const cleaned = s
-    // eslint-disable-next-line no-control-regex
     .replace(/[/\\:*?"<>|\u0000-\u001f]/g, '-')
     .replace(/\s+/g, ' ')
     .replace(/[-. ]+$/, '')

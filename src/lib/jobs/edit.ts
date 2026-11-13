@@ -93,7 +93,10 @@ export function applyEdit(job: Job, op: EditOp): Job {
         if (at <= 0) throw new EditError('A part can only be cut between two of its own pages.');
         const head: Part = { ...part, pages: part.pages.slice(0, at) };
         const tail: Part = {
-          id: nanoid(8),
+          // Derived, not random: the browser applies this edit too, and a follow-up
+          // edit it sends must name the same part the server created. No two parts
+          // can start on the same page, so this is unique within the file.
+          id: `${part.id.split('~')[0]}~${op.atPage}`,
           name: nextUnknownName(file.parts.map((p) => p.name)),
           pages: part.pages.slice(at),
           confidence: 'low',

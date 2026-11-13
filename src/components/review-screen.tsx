@@ -209,19 +209,6 @@ function PartGroup({
           onCommit={(name) => onEdit({ op: 'rename', fileId: file.id, partId: part.id, name })}
           className={`text-sm font-medium ${out ? 'text-muted-foreground line-through' : ''} ${flag === 'unknown' && !out ? 'text-brass' : ''}`}
         />
-        {out ? (
-          <span className="text-xs text-muted-foreground">{t.part.discarded}</span>
-        ) : (
-          flagged && (
-            <span
-              title={part.flags.map((f) => t.part.flagHint[f]).join('\n')}
-              className="inline-flex shrink-0 cursor-help items-center gap-1 rounded-full bg-brass-soft px-2 py-0.5 text-[11px] font-medium text-brass"
-            >
-              <AlertTriangle className="size-3" />
-              {t.part.flag[flag]}
-            </span>
-          )
-        )}
         <button
           type="button"
           title={out ? t.part.restore : t.part.discard}
@@ -256,6 +243,19 @@ function PartGroup({
           </Fragment>
         ))}
       </div>
+      {/* Zero intrinsic width: the note never makes a part wider than its pages. */}
+      <p className="h-4 w-0 min-w-full truncate pl-2 text-[11px] leading-4">
+        {out ? (
+          <span className="text-muted-foreground">{t.part.discarded}</span>
+        ) : (
+          flagged && (
+            <span title={part.flags.map((f) => t.part.flagHint[f]).join(' ')} className="cursor-help font-medium text-brass">
+              <AlertTriangle className="mr-1 inline size-3 align-[-2px]" />
+              {t.part.flag[flag]}
+            </span>
+          )
+        )}
+      </p>
     </div>
   );
 }
@@ -360,7 +360,7 @@ function FileBlock({
   return (
     <div className="flex flex-col gap-2">
       {header}
-      <div className="flex flex-wrap items-end gap-y-5">
+      <div className="flex flex-wrap items-start gap-y-3">
         {file.parts.map((part, i) => (
           <Fragment key={part.id}>
             {i > 0 ? (

@@ -38,6 +38,19 @@ describe('matchPartName', () => {
     ['Solo Comet', 'Solo Cornet'], // classic OCR slip
     ['lst Baritone', '1st Baritone'], // l for 1
     ['SOLO CORNET', 'Solo Cornet'],
+    // Seen in the owner's scans:
+    ['Solo Bb Cornet 1&2', 'Solo Cornet 1+2'],
+    ['Solo Bb Cornet 3&4', 'Solo Cornet 3+4'],
+    ['4st Horn Eb', '1st Horn'],
+    ['Ist Bb Baritone', '1st Baritone'],
+    ['Percussion |', 'Percussion 1'],
+    ['Bells', 'Bells'],
+    ['Tin Whistle (optional)', 'Tin Whistle'],
+    ['Bagpipes (optional)', 'Bagpipes'],
+    ['Bagpipe', 'Bagpipes'],
+    ['Wind Chimes', 'Wind Chimes'],
+    ['Bass Eb', 'Eb Bass'],
+    ['Solo Cornet Bb', 'Solo Cornet'],
   ];
   it.each(cases)('%s → %s', (input, expected) => {
     expect(matchPartName(input)?.name).toBe(expected);
@@ -48,6 +61,22 @@ describe('matchPartName', () => {
     expect(matchPartName('Solo Bb Cornet')?.exact).toBe(true);
     expect(matchPartName('Solo Comet')?.exact).toBe(false);
     expect(matchPartName('Solo Cornat')?.exact).toBe(false);
+  });
+
+  it('treats the common OCR reading "Ist" as a clean 1st', () => {
+    expect(matchPartName('Ist Bb Baritone')?.exact).toBe(true);
+  });
+
+  it('trusts the lone letter OCR leaves of a flat sign on a bass part', () => {
+    expect(matchPartName('E> Bass')).toEqual({ name: 'Eb Bass', exact: true, key: 'Eb' });
+  });
+
+  it('reports the key, which tells treble- and bass-clef variants apart', () => {
+    expect(matchPartName('1st Bb Trombone')?.key).toBe('Bb');
+    expect(matchPartName('1st Trombone')?.key).toBeNull();
+    expect(matchPartName('Bass Trombone C')?.key).toBe('C');
+    expect(matchPartName('Bass B> Trombone')?.key).toBe('Bb');
+    expect(matchPartName('Eb Bass')?.key).toBe('Eb');
   });
 
   it.each(['ALLADALE', 'Philip Sparke', 'from Hymn of the Highlands', '', 'cup mute', '- 2 -'])(

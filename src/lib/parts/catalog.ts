@@ -35,6 +35,10 @@ export const INSTRUMENTS: Instrument[] = [
   { family: 'xylophone', display: 'Xylophone', kind: 'numbered', aliases: ['xylophone', 'xylophon'] },
   { family: 'vibraphone', display: 'Vibraphone', kind: 'numbered', aliases: ['vibraphone', 'vibraphon'] },
   { family: 'tubularbells', display: 'Tubular Bells', kind: 'numbered', aliases: ['tubular bells', 'röhrenglocken', 'chimes'] },
+  { family: 'windchimes', display: 'Wind Chimes', kind: 'numbered', aliases: ['wind chimes', 'windchimes'] },
+  { family: 'bells', display: 'Bells', kind: 'numbered', aliases: ['bells', 'glocken'] },
+  { family: 'tinwhistle', display: 'Tin Whistle', kind: 'numbered', aliases: ['tin whistle'] },
+  { family: 'bagpipes', display: 'Bagpipes', kind: 'numbered', aliases: ['bagpipes', 'bagpipe', 'dudelsack', 'pipes'] },
   { family: 'snaredrum', display: 'Snare Drum', kind: 'numbered', aliases: ['snare drum', 'kleine trommel'] },
   { family: 'bassdrum', display: 'Bass Drum', kind: 'numbered', aliases: ['bass drum', 'grosse trommel'] },
   { family: 'mallets', display: 'Mallets', kind: 'numbered', aliases: ['mallets', 'mallet percussion'] },
@@ -46,14 +50,14 @@ export const RANKS: Rank[] = [
   { display: 'Soprano', order: 0, aliases: ['soprano', 'sopran'] },
   { display: 'Solo', order: 1, aliases: ['solo'] },
   { display: 'Repiano', order: 2, aliases: ['repiano', 'ripiano'] },
-  { display: '1st', order: 3, aliases: ['1st', '1', 'first', 'i'], slips: ['lst', 'ist', '1s'] },
+  { display: '1st', order: 3, aliases: ['1st', '1', 'first', 'i', 'ist', 'lst'], slips: ['4st', '1s'] },
   { display: '2nd', order: 4, aliases: ['2nd', '2', 'second', 'ii'], slips: ['znd', '2nc'] },
   { display: '3rd', order: 5, aliases: ['3rd', '3', 'third', 'iii'], slips: ['3rc', 'srd'] },
   { display: '4th', order: 6, aliases: ['4th', '4', 'fourth'] },
 ];
 
 /** Words that join two ranks ("2nd & 3rd Cornet") or pad a name ("Cornet in Bb"). */
-export const FILLER = new Set(['&', '+', 'and', 'und', 'in', 'for', 'für']);
+export const FILLER = new Set(['&', '+', 'and', 'und', 'in', 'for', 'für', 'optional', 'opt', 'ad', 'lib']);
 
 /** Names offered as suggestions in the review screen, in score order. */
 export const STANDARD_PARTS: string[] = [

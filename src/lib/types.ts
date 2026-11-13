@@ -1,11 +1,20 @@
 export type Confidence = 'high' | 'low';
 
-export type PartMatch = { name: string; exact: boolean };
+/** Transposition printed next to a part name; tells treble- and bass-clef variants apart. */
+export type PartKey = 'Bb' | 'Eb' | 'C';
+
+export type PartMatch = { name: string; exact: boolean; key: PartKey | null };
 
 /** Coordinates are fractions 0..1 of the rendered header strip. */
 export type OcrLine = { text: string; x0: number; x1: number; y0: number; y1: number };
 
-export type PageDetection = { partName: string | null; confidence: Confidence; rawText: string };
+export type PageDetection = {
+  partName: string | null;
+  confidence: Confidence;
+  /** All text found in the page header, one label per line. */
+  rawText: string;
+  key: PartKey | null;
+};
 
 export type FileClass = 'score' | 'single' | 'combined';
 

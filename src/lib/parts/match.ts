@@ -1,4 +1,4 @@
-import type { PartMatch } from '@/lib/types';
+import type { PartKey, PartMatch } from '@/lib/types';
 import { FILLER, INSTRUMENTS, RANKS, type Instrument, type Rank } from './catalog';
 
 type Hit = { instrument: Instrument; start: number; end: number; exact: boolean };
@@ -26,7 +26,8 @@ export function tokenize(text: string): string[] {
     .toLowerCase()
     .replace(/♭/g, 'b')
     .replace(/(\d)\./g, '$1 ')
-    .replace(/[^\p{L}\p{N}&+]+/gu, ' ')
+    .replace(/[&+|]/g, ' $& ')
+    .replace(/[^\p{L}\p{N}&+|]+/gu, ' ')
     .trim()
     .split(' ')
     .filter(Boolean);
@@ -80,15 +81,24 @@ export function instrumentFamilies(text: string): string[] {
   return families;
 }
 
-function bassKey(token: string): 'Eb' | 'Bb' | null {
+function keyOf(token: string): PartKey | null {
   if (token === 'eb' || token === 'es' || token === 'e') return 'Eb';
   if (token === 'bb' || token === 'b') return 'Bb';
+  if (token === 'c') return 'C';
+  return null;
+}
+
+/** A digit after the instrument numbers the part: "Percussion 2", "Solo Cornet 1&2". OCR reads a lone 1 as | or l. */
+function partNumber(token: string): string | null {
+  if (/^\d$/.test(token)) return token;
+  if (token === '|' || token === 'l') return '1';
   return null;
 }
 
 export function matchPartName(text: string): PartMatch | null {
   const tokens = tokenize(text);
-  if (tokens.length === 0 || tokens.length > MAX_TOKENS) return null;
+  const words = tokens.filter((t) => t !== '|');
+  if (words.length === 0 || words.length > MAX_TOKENS) return null;
 
   const hits = findHits(tokens);
   if (hits.length === 0) return null;
@@ -101,38 +111,38 @@ export function matchPartName(text: string): PartMatch | null {
 
   let exact = hits.every((h) => h.exact);
   const ranks: Rank[] = [];
-  let key: 'Eb' | 'Bb' | null = null;
+  const numbers: string[] = [];
+  let key: PartKey | null = null;
   let bassRank = false;
-  let suffix = '';
   let unknown = 0;
 
   tokens.forEach((token, i) => {
     if (used.has(i) || FILLER.has(token)) return;
 
-    if (instrument.kind === 'numbered') {
-      if (i === hit.end && /^\d$/.test(token)) suffix = ` ${token}`;
-      else if (token.length > 2) unknown++;
-      return;
+    if (i >= hit.end) {
+      const n = partNumber(token);
+      if (n) {
+        numbers.push(n);
+        return;
+      }
     }
+    if (token === '|') return;
     if (instrument.family === 'trombone' && token === 'bass') {
       bassRank = true;
       return;
     }
-    const rank = RANK_INDEX.get(token);
+    const rank = instrument.kind === 'numbered' ? undefined : RANK_INDEX.get(token);
     if (rank) {
       if (!ranks.includes(rank.rank)) ranks.push(rank.rank);
       if (!rank.exact) exact = false;
       return;
     }
-    if (instrument.kind === 'keyed') {
-      const k = bassKey(token);
-      if (k) {
-        key = k;
-        if (token.length < 2) exact = false;
-        return;
-      }
+    const k = keyOf(token);
+    if (k) {
+      key = k;
+      return;
     }
-    // Short leftovers are keys ("Bb", "C") or what OCR made of a flat sign.
+    // Other short leftovers are OCR debris from a flat sign.
     if (token.length > 2) unknown++;
   });
 
@@ -142,8 +152,9 @@ export function matchPartName(text: string): PartMatch | null {
   ranks.sort((a, b) => a.order - b.order);
   const prefix = [
     ...(bassRank ? ['Bass'] : []),
-    ...(key ? [key] : []),
+    ...(instrument.kind === 'keyed' && key ? [key] : []),
     ...(ranks.length ? [ranks.map((r) => r.display).join(' + ')] : []),
   ];
-  return { name: [...prefix, instrument.display].join(' ') + suffix, exact };
+  const suffix = numbers.length ? ` ${numbers.join('+')}` : '';
+  return { name: [...prefix, instrument.display].join(' ') + suffix, exact, key };
 }

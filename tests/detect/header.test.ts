@@ -43,14 +43,20 @@ it('keeps a shared part', () => {
   expect(detectPart([L('2nd & 3rd Cornet', 0.03, 0.25)]).partName).toBe('2nd + 3rd Cornet');
 });
 
-it('breaks a tie in the same zone towards the lower line', () => {
-  expect(detectPart([L('Solo Horn', 0.03, 0.2, 0.2), L('1st Horn', 0.03, 0.2, 0.6)]).partName).toBe('1st Horn');
+it('prefers an exact match over a fuzzy one in the same zone', () => {
+  // A playing instruction further down the strip that OCR happens to read as an instrument.
+  const lines = [L('Solo Bb Cornet', 0.03, 0.2, 0.3), L('Belle', 0.03, 0.1, 0.8)];
+  expect(detectPart(lines)).toMatchObject({ partName: 'Solo Cornet', confidence: 'high' });
+});
+
+it('breaks a remaining tie towards the upper line', () => {
+  expect(detectPart([L('1st Horn', 0.03, 0.2, 0.6), L('Solo Horn', 0.03, 0.2, 0.2)]).partName).toBe('Solo Horn');
 });
 
 it('returns null and the raw text when nothing matches', () => {
-  expect(detectPart([L('- 2 -', 0.45, 0.55)])).toEqual({ partName: null, confidence: 'high', rawText: '- 2 -' });
+  expect(detectPart([L('- 2 -', 0.45, 0.55)])).toEqual({ partName: null, confidence: 'high', rawText: '- 2 -', key: null });
 });
 
 it('handles a page with no text', () => {
-  expect(detectPart([])).toEqual({ partName: null, confidence: 'high', rawText: '' });
+  expect(detectPart([])).toEqual({ partName: null, confidence: 'high', rawText: '', key: null });
 });

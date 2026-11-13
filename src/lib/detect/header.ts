@@ -31,10 +31,17 @@ export function detectPart(lines: OcrLine[]): PageDetection {
     const match = matchPartName(line.text);
     if (match) candidates.push({ line, match, zone: zoneOf(line) });
   }
-  if (candidates.length === 0) return { partName: null, confidence: 'high', rawText };
+  if (candidates.length === 0) return { partName: null, confidence: 'high', rawText, key: null };
 
-  candidates.sort((a, b) => ZONE_RANK[a.zone] - ZONE_RANK[b.zone] || b.line.y0 - a.line.y0);
+  // Margin before centre, a clean reading before a doubtful one, and the
+  // upper line before a lower one: playing instructions sit below the title block.
+  candidates.sort(
+    (a, b) =>
+      ZONE_RANK[a.zone] - ZONE_RANK[b.zone] ||
+      Number(b.match.exact) - Number(a.match.exact) ||
+      a.line.y0 - b.line.y0,
+  );
   const best = candidates[0];
   const confident = best.match.exact && best.zone !== 'centre';
-  return { partName: best.match.name, confidence: confident ? 'high' : 'low', rawText };
+  return { partName: best.match.name, confidence: confident ? 'high' : 'low', rawText, key: best.match.key };
 }

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "probe": "tsx scripts/probe.ts"
+    "probe": "tsx scripts/probe.ts",
+    "postinstall": "node scripts/fetch-tessdata.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -46,5 +47,6 @@
     "typescript": "^5",
     "vitest": "^5.1.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "type": "module"
 }

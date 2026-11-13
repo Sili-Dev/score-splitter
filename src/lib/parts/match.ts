@@ -101,7 +101,15 @@ export function matchPartName(text: string): PartMatch | null {
   if (words.length === 0 || words.length > MAX_TOKENS) return null;
 
   const hits = findHits(tokens);
-  if (hits.length === 0) return null;
+  if (hits.length === 0) {
+    // "Soprano" or "Repiano" alone: the rank names the instrument.
+    const i = tokens.findIndex((t) => RANK_INDEX.get(t)?.rank.implies);
+    const implied = i >= 0 ? RANK_INDEX.get(tokens[i]) : undefined;
+    const instrument = INSTRUMENTS.find((x) => x.family === implied?.rank.implies);
+    // Only a full spelling counts: a bare "rep" or "sop" is too short to trust.
+    if (!instrument || tokens[i].length < 5) return null;
+    hits.push({ instrument, start: i, end: i, exact: true });
+  }
   if (new Set(hits.map((h) => h.instrument.family)).size > 1) return null;
 
   const hit = hits[0];

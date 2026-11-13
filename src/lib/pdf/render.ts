@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, sep } from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
 
 /** Share of the page height, from the top, that is searched for a part name. */
@@ -27,13 +26,17 @@ function loadPdfJs(): Promise<PdfJs> {
   return pdfjsPromise;
 }
 
+/**
+ * Folder of a pdf.js asset set, as pdf.js wants it in Node: a plain path
+ * ending in a slash. It reads these with fs, which does not take file: URLs.
+ */
 function assetUrl(folder: string): string {
   const require = createRequire(join(process.cwd(), 'package.json'));
   const root = dirname(require.resolve('pdfjs-dist/package.json'));
-  return pathToFileURL(join(root, folder)).href + '/';
+  return join(root, folder).split(sep).join('/') + '/';
 }
 
-export async function openPdf(path: string): Promise<OpenPdf> {
+export async function openPdf(path: string, options: { warnings?: boolean } = {}): Promise<OpenPdf> {
   const pdfjs = await loadPdfJs();
   const data = new Uint8Array(await readFile(path));
   const doc = await pdfjs.getDocument({
@@ -42,7 +45,7 @@ export async function openPdf(path: string): Promise<OpenPdf> {
     cMapUrl: assetUrl('cmaps'),
     wasmUrl: assetUrl('wasm'),
     iccUrl: assetUrl('iccs'),
-    verbosity: 0,
+    verbosity: options.warnings ? 1 : 0,
   }).promise;
 
   /** Renders the top `fraction` of a page at `scale` (1 = 72 dpi). */
@@ -82,9 +85,11 @@ export async function openPdf(path: string): Promise<OpenPdf> {
     async pageText(pageIndex) {
       const page = await doc.getPage(pageIndex + 1);
       const content = await page.getTextContent();
+      // One label per line: a part name and a title on the same baseline are separate items.
       return content.items
-        .map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : ' ') : ''))
-        .join('');
+        .map((item) => ('str' in item ? item.str.trim() : ''))
+        .filter(Boolean)
+        .join('\n');
     },
     async close() {
       await doc.loadingTask.destroy();

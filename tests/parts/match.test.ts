@@ -51,6 +51,12 @@ describe('matchPartName', () => {
     ['Wind Chimes', 'Wind Chimes'],
     ['Bass Eb', 'Eb Bass'],
     ['Solo Cornet Bb', 'Solo Cornet'],
+    // A number can come first or last; the result is the same name either way.
+    ['1. Schlagzeug', 'Percussion 1'],
+    ['2nd Percussion', 'Percussion 2'],
+    ['Cornet 2', '2nd Cornet'],
+    ['Posaune 1', '1st Trombone'],
+    ['Horn 2 Eb', '2nd Horn'],
   ];
   it.each(cases)('%s → %s', (input, expected) => {
     expect(matchPartName(input)?.name).toBe(expected);

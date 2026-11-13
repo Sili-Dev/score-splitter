@@ -1,7 +1,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { detectFile } from '@/lib/detect';
 import { groupPages } from '@/lib/detect/group';
 import { openPdf } from '@/lib/pdf/render';
@@ -58,3 +59,24 @@ it('rejects a file that is not a PDF', async () => {
   await writeFile(path, 'not a pdf');
   await expect(openPdf(path)).rejects.toThrow();
 });
+
+it('finds the fonts pdf.js needs for text that does not embed its own', async () => {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.TimesRoman);
+  doc.addPage([595, 842]).drawText('Solo Cornet', { x: 40, y: 780, size: 14, font });
+  const path = join(tmp, 'text.pdf');
+  await writeFile(path, await doc.save());
+
+  const logged: string[] = [];
+  const spies = (['log', 'warn', 'error'] as const).map((m) =>
+    vi.spyOn(console, m).mockImplementation((...args: unknown[]) => void logged.push(args.join(' '))),
+  );
+  try {
+    const pdf = await openPdf(path, { warnings: true });
+    await pdf.renderThumb(0, 240);
+    await pdf.close();
+  } finally {
+    spies.forEach((s) => s.mockRestore());
+  }
+  expect(logged.filter((l) => /unable to load|font data/i.test(l))).toEqual([]);
+}, 60_000);

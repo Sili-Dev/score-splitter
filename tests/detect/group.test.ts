@@ -150,3 +150,26 @@ it('starts an unknown part on a first page with no recognised instrument', () =>
     ['Drum Set', [4]],
   ]);
 });
+
+it('does not invent key names when OCR read the key on one copy and missed it on the other', () => {
+  const cornets = groupPages([
+    first('Solo Cornet', 'Solo Bb Cornet', 'Bb'),
+    first('2nd Cornet', '2nd Cornet'),
+    first('Solo Cornet', 'Solo Cornet'),
+  ]);
+  expect(cornets.map((p) => p.name)).toEqual(['Solo Cornet', '2nd Cornet', 'Solo Cornet']);
+  expect(cornets[0].flags).toEqual(['duplicate']);
+
+  const horns = groupPages([
+    first('1st Horn', '1st Eb Horn', 'Eb'),
+    first('2nd Horn', '2nd Horn'),
+    first('1st Horn', '1st Horn'),
+  ]);
+  expect(horns.map((p) => p.name)).toEqual(['1st Horn', '2nd Horn', '1st Horn']);
+  expect(horns[2].flags).toEqual(['duplicate']);
+});
+
+it('leaves a bass, whose key is already in its name, alone', () => {
+  const ps = groupPages([first('Eb Bass', 'Eb Bass', 'Eb'), first('Timpani', 'Timpani'), first('Eb Bass', 'Bass', null)]);
+  expect(ps.map((p) => p.name)).toEqual(['Eb Bass', 'Timpani', 'Eb Bass']);
+});

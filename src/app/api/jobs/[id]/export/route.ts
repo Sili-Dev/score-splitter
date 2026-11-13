@@ -1,5 +1,5 @@
 import { PassThrough, Readable } from 'node:stream';
-import { exportProblems, safeName, writeExportZip } from '@/lib/export';
+import { ExportSourceError, exportProblems, prepareExport, safeName } from '@/lib/export';
 import { readJob } from '@/lib/jobs/store';
 
 export const runtime = 'nodejs';
@@ -17,8 +17,16 @@ export async function GET(_request: Request, { params }: Context): Promise<Respo
     return Response.json({ error: 'Some parts still need attention.', blocking }, { status: 409 });
   }
 
+  let write: Awaited<ReturnType<typeof prepareExport>>;
+  try {
+    write = await prepareExport(job);
+  } catch (cause) {
+    if (!(cause instanceof ExportSourceError)) throw cause;
+    return Response.json({ error: cause.message, blocking: [cause.message] }, { status: 409 });
+  }
+
   const pipe = new PassThrough();
-  writeExportZip(job, pipe).catch((cause) => pipe.destroy(cause as Error));
+  write(pipe).catch((cause) => pipe.destroy(cause as Error));
 
   const name = `${safeName(job.name)}.zip`;
   const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'");

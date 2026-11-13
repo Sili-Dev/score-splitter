@@ -20,12 +20,13 @@ export function safeName(s: string): string {
 
 /** Hands out names, adding " (2)", " (3)" to repeats. Case-insensitive, as Windows and macOS are. */
 function uniquer() {
-  const used = new Map<string, number>();
+  const used = new Set<string>();
   return (name: string): string => {
-    const key = name.toLowerCase();
-    const n = (used.get(key) ?? 0) + 1;
-    used.set(key, n);
-    return n === 1 ? name : `${name} (${n})`;
+    let candidate = name;
+    // Keep counting until the name is free: a part may itself be called "Solo Cornet (2)".
+    for (let n = 2; used.has(candidate.toLowerCase()); n++) candidate = `${name} (${n})`;
+    used.add(candidate.toLowerCase());
+    return candidate;
   };
 }
 

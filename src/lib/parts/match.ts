@@ -131,8 +131,15 @@ export function matchPartName(text: string): PartMatch | null {
       bassRank = true;
       return;
     }
-    const rank = instrument.kind === 'numbered' ? undefined : RANK_INDEX.get(token);
-    if (rank) {
+    const rank = RANK_INDEX.get(token);
+    if (rank && instrument.kind === 'numbered') {
+      // "1. Schlagzeug", "2nd Percussion": the number of a numbered part, printed first.
+      if (/^\d/.test(rank.rank.display)) {
+        numbers.push(rank.rank.display[0]);
+        if (!rank.exact) exact = false;
+        return;
+      }
+    } else if (rank) {
       if (!ranks.includes(rank.rank)) ranks.push(rank.rank);
       if (!rank.exact) exact = false;
       return;
@@ -148,6 +155,15 @@ export function matchPartName(text: string): PartMatch | null {
 
   if (unknown > MAX_UNKNOWN) return null;
   if (unknown > 0) exact = false;
+
+  // "Cornet 2", "Posaune 1": the rank of a ranked part, printed last.
+  if (instrument.kind !== 'numbered' && ranks.length === 0 && numbers.length === 1) {
+    const rank = RANKS.find((r) => r.display.startsWith(numbers[0]));
+    if (rank) {
+      ranks.push(rank);
+      numbers.length = 0;
+    }
+  }
 
   ranks.sort((a, b) => a.order - b.order);
   const prefix = [

@@ -78,6 +78,9 @@ export function findFirstPages(detections: PageDetection[]): boolean[] | null {
 
 type Draft = Part & { key: PartKey | null };
 
+/** Instruments whose parts come in Bb treble clef and in C bass clef. */
+const TWO_CLEF = /Trombone|Euphonium|Baritone/;
+
 /**
  * Parts that share a name but were printed with different keys are different
  * parts: a trombone part in Bb treble clef and the same part in C bass clef.
@@ -86,14 +89,16 @@ type Draft = Part & { key: PartKey | null };
 function nameByKey(drafts: Draft[]): void {
   const byName = new Map<string, Draft[]>();
   for (const d of drafts) byName.set(d.name, [...(byName.get(d.name) ?? []), d]);
-  for (const group of byName.values()) {
+  for (const [name, group] of byName) {
+    // Only these are printed in both clefs. For any other instrument a key that
+    // shows on one copy and not on another is OCR missing a flat sign, not a variant.
+    if (group.length < 2 || !TWO_CLEF.test(name)) continue;
     const keys = new Set(group.map((d) => d.key));
-    if (group.length < 2 || keys.size < 2) continue;
-    // By convention an unmarked part next to a Bb one is in C, and the reverse.
-    const unmarked: PartKey | null = keys.has('Bb') ? 'C' : keys.has('C') ? 'Bb' : null;
+    if (!keys.has('Bb') || !(keys.has('C') || keys.has(null))) continue;
+    // By convention the part printed next to a Bb one, marked or not, is in C.
     for (const d of group) {
-      const key = d.key ?? unmarked;
-      if (key) d.name = `${d.name} (${key})`;
+      if (d.key === 'Bb') d.name = `${name} (Bb)`;
+      else if (d.key === 'C' || d.key === null) d.name = `${name} (C)`;
     }
   }
 }

@@ -8,6 +8,7 @@ import { ingestLoosePdfs, ingestZip, processJob, resumeUnfinishedJobs, type Proc
 import { createJob, deleteJob, jobDir, jobFilesDir, readJob, updateJob } from '@/lib/jobs/store';
 import type { Job, PageDetection, SourceFile } from '@/lib/types';
 import { UploadTooLargeError } from '@/lib/zip/unpack';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { makeScanPdf } from '../helpers/makeScan';
 import { makeRawZip } from '../helpers/rawZip';
 
@@ -236,3 +237,58 @@ it('deletes jobs older than the lifetime and keeps newer ones', async () => {
   expect(await readJob(old.id)).toBeNull();
   expect(await readJob(fresh.id)).not.toBeNull();
 });
+
+it('marks a file the splitter cannot open as an error instead of failing later at download', async () => {
+  const zip = await writeZip('locked.zip', [
+    { name: 'P/P - parts.pdf', data: scan4 },
+    { name: 'P/P - score.pdf', data: scan1 },
+  ]);
+  const job = await createJob('upload');
+  await ingestZip(job.id, zip, 'locked.zip');
+  const locked = byName((await readJob(job.id)) as Job, 'P - parts.pdf').storedPath;
+  await processJob(job.id, {
+    ...fakeDeps(['Solo Cornet', null, null, null]),
+    async checkSplittable(path) {
+      if (path === locked) throw new Error('Input document is encrypted');
+    },
+  });
+  const done = (await readJob(job.id)) as Job;
+  expect(byName(done, 'P - parts.pdf')).toMatchObject({ status: 'error' });
+  expect(byName(done, 'P - parts.pdf').error).toMatch(/protected/i);
+  expect(byName(done, 'P - score.pdf').status).toBe('done');
+}, 60_000);
+
+async function textPdf(labels: string[]): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.TimesRoman);
+  for (const label of labels) {
+    const page = doc.addPage([595, 842]);
+    page.drawText('A Piece', { x: 250, y: 800, size: 20, font });
+    page.drawText(label, { x: 40, y: 770, size: 12, font });
+  }
+  return Buffer.from(await doc.save());
+}
+
+it('reads a digital PDF with a different part on each page as a set of parts, whatever its name', async () => {
+  const data = await textPdf(['Soprano Cornet', 'Solo Cornet', 'Timpani']);
+  const zip = await writeZip('digital.zip', [{ name: 'P/scan0001.pdf', data }]);
+  const job = await createJob('upload');
+  await ingestZip(job.id, zip, 'digital.zip');
+  const calls: string[] = [];
+  await processJob(job.id, fakeDeps(['Soprano Cornet', 'Solo Cornet', 'Timpani'], calls));
+
+  const file = byName((await readJob(job.id)) as Job, 'scan0001.pdf');
+  expect(file.class).toBe('combined');
+  expect(file.parts.map((p) => p.name)).toEqual(['Soprano Cornet', 'Solo Cornet', 'Timpani']);
+  expect(calls).toHaveLength(1);
+}, 60_000);
+
+it('still reads a digital PDF that names one part throughout as that single part', async () => {
+  const zip = await writeZip('one.zip', [{ name: 'P/scan0002.pdf', data: await textPdf(['Solo Cornet', 'Solo Cornet']) }]);
+  const job = await createJob('upload');
+  await ingestZip(job.id, zip, 'one.zip');
+  await processJob(job.id, fakeDeps([]));
+  const file = byName((await readJob(job.id)) as Job, 'scan0002.pdf');
+  expect(file).toMatchObject({ class: 'single', pageCount: 2 });
+  expect(file.parts.map((p) => p.name)).toEqual(['Solo Cornet']);
+}, 60_000);

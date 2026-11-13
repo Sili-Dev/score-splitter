@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import yauzl from 'yauzl';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { exportProblems, planExport, safeName, writeExportZip } from '@/lib/export';
+import { ExportSourceError, exportProblems, planExport, safeName, writeExportZip } from '@/lib/export';
 import { extractPages } from '@/lib/pdf/split';
 import type { FileClass, Job, Part, SourceFile } from '@/lib/types';
 import { makeScanPdf } from './helpers/makeScan';
@@ -116,6 +116,16 @@ describe('planExport', () => {
     ]);
   });
 
+  it('never plans two files with the same path, even when a part is already called "(2)"', () => {
+    const j = job([
+      file('combined', [part('Solo Cornet', [0]), part('Solo Cornet', [1]), part('Solo Cornet (2)', [2])]),
+    ]);
+    const all = paths(j);
+    expect(new Set(all.map((p) => p.toLowerCase())).size).toBe(3);
+    expect(all[1]).toBe('Adventskonzert/Alladale/Alladale - Solo Cornet (2).pdf');
+    expect(all[2]).toBe('Adventskonzert/Alladale/Alladale - Solo Cornet (2) (2).pdf');
+  });
+
   it('treats names differing only in case as duplicates, for Windows and macOS', () => {
     const j = job([file('combined', [part('Solo Cornet', [0]), part('solo cornet', [1])])]);
     expect(paths(j)[1]).toBe('Adventskonzert/Alladale/Alladale - solo cornet (2).pdf');
@@ -218,6 +228,22 @@ describe('writeExportZip', () => {
       'Adventskonzert/Alladale/Alladale - C.pdf': 1,
     });
   }, 60_000);
+
+  it('refuses before writing a byte when a file to be split cannot be opened, and names it', async () => {
+    const broken = join(tmp, 'broken.pdf');
+    await writeFile(broken, 'not a pdf at all');
+    const j = job([
+      file('combined', [part('A', [0]), part('B', [1])], { storedPath: broken, originalName: 'Broken set.pdf' }),
+      file('score', []),
+    ]);
+    const path = join(tmp, 'never.zip');
+    const out = createWriteStream(path);
+    const failure = await writeExportZip(j, out).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ExportSourceError);
+    expect((failure as Error).message).toContain('Broken set.pdf');
+    await new Promise<void>((ok) => out.end(() => ok()));
+    expect((await readFile(path)).length).toBe(0);
+  });
 
   it('copies pages without re-encoding the scan', async () => {
     const source = await readFile(fivePages);

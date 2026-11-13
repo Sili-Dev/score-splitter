@@ -1,9 +1,10 @@
 import { nanoid } from 'nanoid';
-import { classifyFile, partNameFromFileName, partNameFromText } from '@/lib/classify';
+import { classifyByName, classifyFile, partNameFromFileName, partNameFromText } from '@/lib/classify';
 import { getConfig } from '@/lib/config';
 import { detectFile as realDetectFile } from '@/lib/detect';
 import { groupPages, reflag } from '@/lib/detect/group';
 import { openPdf } from '@/lib/pdf/render';
+import { loadForSplitting } from '@/lib/pdf/split';
 import type { Job, PageDetection, Part, Piece, SourceFile } from '@/lib/types';
 import { piecesFromLoosePdfs, unpackZip, type UnpackedFile, type UnpackedPiece } from '@/lib/zip/unpack';
 import { jobFilesDir, listJobIds, readJob, updateJob } from './store';
@@ -15,9 +16,14 @@ export type ProcessDeps = {
     onPage?: (done: number, total: number) => void,
     concurrency?: number,
   ): Promise<PageDetection[]>;
+  /** Throws if the PDF cannot be opened by the library that splits it. Defaults to really trying. */
+  checkSplittable?(path: string): Promise<unknown>;
 };
 
 const defaultDeps: ProcessDeps = { detectFile: realDetectFile };
+
+/** How many pages of a digital PDF are read to see whether it holds more than one part. */
+const TEXT_PAGES_CHECKED = 40;
 
 /** A zip may expand to this many times the upload limit before it is refused. */
 const ZIP_EXPANSION_LIMIT = 4;
@@ -92,11 +98,17 @@ async function processFile(jobId: string, file: SourceFile, deps: ProcessDeps): 
 
   let pageCount: number;
   let firstPageText: string;
+  // Part names found in the text of the pages, for PDFs that are not scans.
+  const namesInText = new Set<string>();
   try {
     const pdf = await openPdf(file.storedPath);
     try {
       pageCount = pdf.pageCount;
       firstPageText = pageCount > 0 ? await pdf.pageText(0) : '';
+      for (let page = 0; firstPageText.trim() && page < Math.min(pageCount, TEXT_PAGES_CHECKED); page++) {
+        const name = partNameFromText(page === 0 ? firstPageText : await pdf.pageText(page));
+        if (name) namesInText.add(name);
+      }
     } finally {
       await pdf.close();
     }
@@ -110,7 +122,20 @@ async function processFile(jobId: string, file: SourceFile, deps: ProcessDeps): 
     );
   }
 
-  const cls = chosenClass ?? classifyFile(file.originalName, firstPageText);
+  // The viewer and the splitter are different libraries. A PDF protected against
+  // editing opens in the first and not in the second; better to say so now than
+  // to fail when the owner presses download.
+  try {
+    await (deps.checkSplittable ?? loadForSplitting)(file.storedPath);
+  } catch {
+    throw new Error('This PDF could not be read for splitting. It may be protected against editing.');
+  }
+
+  let cls = chosenClass ?? classifyFile(file.originalName, firstPageText);
+  // A file whose name says nothing and whose pages name different parts is a set of parts, not one part.
+  if (!chosenClass && cls === 'single' && classifyByName(file.originalName) === null && namesInText.size > 1) {
+    cls = 'combined';
+  }
   let parts: Part[] = [];
   if (cls === 'single') {
     const name = partNameFromFileName(file.originalName) ?? partNameFromText(firstPageText) ?? 'Unbekannt 1';
